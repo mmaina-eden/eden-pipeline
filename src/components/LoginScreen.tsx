@@ -1,13 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SESSION_KEY, RATE_KEY, MAX_ATTEMPTS, LOCKOUT_MS } from "../auth.config";
 import { findUser } from "../lib/userManager";
-import ParticleField from "./ParticleField";
+import ThreeBackground from "./ThreeBackground";
 
 async function sha256(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
-
 function getRateData() {
   try { return JSON.parse(localStorage.getItem(RATE_KEY) || '{"attempts":[],"lockedUntil":0}'); }
   catch { return { attempts: [], lockedUntil: 0 }; }
@@ -26,59 +25,33 @@ function recordFailure() {
 function clearRateData() { localStorage.removeItem(RATE_KEY); }
 function formatMs(ms: number) {
   const s = Math.ceil(ms / 1000);
-  return s >= 60 ? Math.ceil(s / 60) + "m " + (s % 60) + "s" : s + "s";
+  return s >= 60 ? Math.ceil(s / 60) + "m" : s + "s";
 }
 
 const CSS = `
-  .ls-card {
-    animation: fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) both;
+  /* 3D tilt card */
+  .ls-tilt { transform-style: preserve-3d; transition: transform 0.1s ease; will-change: transform; }
+  /* Scan beam */
+  .ls-scan { position:absolute; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent 0%,#dc2626 30%,#ffffff 50%,#dc2626 70%,transparent 100%); animation:scanDown 4s ease-in-out infinite 0.5s; }
+  @keyframes scanDown { 0%{top:-1px;opacity:0} 8%{opacity:1} 90%{opacity:1} 100%{top:100%;opacity:0} }
+  /* Fade-up stagger */
+  .ls-line-1 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.0s both; }
+  .ls-line-2 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both; }
+  .ls-line-3 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.2s both; }
+  .ls-line-4 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both; }
+  .ls-line-5 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.4s both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  /* Shake */
+  @keyframes shakeX { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+  .ls-shake { animation: shakeX 0.4s ease both; }
+  /* Spin */
+  @keyframes spinCW { to { transform: rotate(360deg); } }
+  /* Red heartbeat cross */
+  @keyframes crossPulse {
+    0%,100% { filter: drop-shadow(0 0 8px rgba(220,38,38,0.4)); }
+    50%     { filter: drop-shadow(0 0 24px rgba(220,38,38,0.9)); }
   }
-  .ls-input {
-    transition: all 0.25s;
-    background: rgba(255,255,255,0.04) !important;
-    color: #fff !important;
-  }
-  .ls-input:focus {
-    border-color: #7c3aed !important;
-    box-shadow: 0 0 0 3px rgba(124,58,237,0.2), 0 0 20px rgba(124,58,237,0.15) !important;
-    background: rgba(124,58,237,0.07) !important;
-  }
-  .ls-input::placeholder { color: rgba(255,255,255,0.2); }
-  .ls-btn {
-    transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
-    position: relative; overflow: hidden;
-  }
-  .ls-btn::after {
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(135deg,rgba(255,255,255,0.2),transparent);
-    opacity:0; transition:opacity 0.2s;
-  }
-  .ls-btn:hover:not(:disabled)::after { opacity:1; }
-  .ls-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 16px 48px rgba(124,58,237,0.55) !important; }
-  .ls-btn:active:not(:disabled) { transform:translateY(0) scale(0.98); }
-  .ls-attempt-dot { transition: all 0.2s; }
-  .ls-orb-a { animation: floatA 12s ease-in-out infinite; }
-  .ls-orb-b { animation: floatB 15s ease-in-out infinite; }
-  .ls-orb-c { animation: floatC 10s ease-in-out infinite; }
-  .ls-logo { animation: scaleIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both; }
-  .ls-scan { animation: scan 3s ease-in-out infinite 1s; }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes scaleIn { from{opacity:0;transform:scale(0.7)} to{opacity:1;transform:scale(1)} }
-  @keyframes scan { 0%{transform:translateY(-100%);opacity:0} 20%{opacity:0.4} 80%{opacity:0.4} 100%{transform:translateY(600%);opacity:0} }
-  @keyframes floatA { 0%,100%{transform:translate(0,0)scale(1)} 33%{transform:translate(60px,-40px)scale(1.08)} 66%{transform:translate(-30px,50px)scale(0.95)} }
-  @keyframes floatB { 0%,100%{transform:translate(0,0)scale(1)} 33%{transform:translate(-50px,30px)scale(1.06)} 66%{transform:translate(40px,-60px)scale(0.97)} }
-  @keyframes floatC { 0%,100%{transform:translate(0,0)scale(1)} 50%{transform:translate(30px,40px)scale(1.04)} }
-  @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
-  .gradient-text {
-    background:linear-gradient(135deg,#00d4ff 0%,#a855f7 50%,#00d4ff 100%);
-    background-size:200% auto;
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
-    animation:shimmer 4s linear infinite;
-  }
-  @keyframes shake {
-    0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)}
-  }
-  .ls-shake { animation:shake 0.4s ease both; }
+  .ls-cross { animation: crossPulse 2s ease-in-out infinite; }
 `;
 
 export default function LoginScreen({ onLogin }: { onLogin: (username: string, role: string) => void }) {
@@ -90,6 +63,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (username: string, r
   const [lockRemaining, setLock]= useState(0);
   const [attempts, setAttempts] = useState(0);
   const [shake, setShake]       = useState(false);
+  const cardRef                 = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -101,28 +75,40 @@ export default function LoginScreen({ onLogin }: { onLogin: (username: string, r
     return () => clearInterval(iv);
   }, []);
 
+  // 3D tilt on mouse move
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const card = cardRef.current; if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width  / 2;
+    const cy = rect.top  + rect.height / 2;
+    const dx = (e.clientX - cx) / (rect.width  / 2);
+    const dy = (e.clientY - cy) / (rect.height / 2);
+    card.style.transform = `perspective(900px) rotateY(${dx * 6}deg) rotateX(${-dy * 5}deg) scale3d(1.01,1.01,1.01)`;
+  }
+  function handleMouseLeave() {
+    const card = cardRef.current; if (!card) return;
+    card.style.transform = "perspective(900px) rotateY(0deg) rotateX(0deg) scale3d(1,1,1)";
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError("");
     const { locked } = checkLock(); if (locked) return;
-    if (!username.trim() || !passcode) { setError("Enter both username and passcode."); return; }
+    if (!username.trim() || !passcode) { setError("Enter both fields."); return; }
     setLoading(true);
     try {
       const hash = await sha256(passcode);
       const user = findUser(username);
       if (user && user.passwordHash === hash) {
         clearRateData();
-        const fingerprint = btoa((navigator.userAgent + screen.width + screen.height).slice(0, 200));
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-          username: user.username, role: user.role,
-          loginTime: new Date().toISOString(), fingerprint,
-        }));
+        const fp = btoa((navigator.userAgent + screen.width + screen.height).slice(0, 200));
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ username: user.username, role: user.role, loginTime: new Date().toISOString(), fingerprint: fp }));
         onLogin(user.username, user.role);
       } else {
         recordFailure();
         const d = getRateData(); const remaining = MAX_ATTEMPTS - d.attempts.length;
         const { locked: nowLocked } = checkLock(); setAttempts(d.attempts.length);
-        if (nowLocked) setError(`Too many attempts. Locked for ${formatMs(LOCKOUT_MS)}.`);
-        else setError(`Incorrect credentials. ${remaining > 0 ? remaining + " attempt" + (remaining === 1 ? "" : "s") + " remaining." : ""}`);
+        if (nowLocked) setError(`Locked for ${formatMs(LOCKOUT_MS)}.`);
+        else setError(`Incorrect credentials.${remaining > 0 ? ` ${remaining} left.` : ""}`);
         setPasscode("");
         setShake(true); setTimeout(() => setShake(false), 450);
       }
@@ -135,139 +121,178 @@ export default function LoginScreen({ onLogin }: { onLogin: (username: string, r
   return (
     <>
       <style>{CSS}</style>
+      <ThreeBackground />
 
-      {/* Canvas particle field */}
-      <ParticleField />
+      {/* Subtle red vignette */}
+      <div style={{ position:"fixed", inset:0, zIndex:1, pointerEvents:"none", background:"radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%)" }} />
 
-      {/* Ambient orbs */}
-      <div style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none", overflow:"hidden" }}>
-        <div className="ls-orb-a" style={{ position:"absolute", top:"5%", left:"8%", width:600, height:600, borderRadius:"50%", background:"radial-gradient(circle,rgba(124,58,237,0.14) 0%,transparent 65%)", filter:"blur(40px)" }} />
-        <div className="ls-orb-b" style={{ position:"absolute", bottom:"8%", right:"6%", width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,212,255,0.12) 0%,transparent 65%)", filter:"blur(40px)" }} />
-        <div className="ls-orb-c" style={{ position:"absolute", top:"45%", right:"20%", width:350, height:350, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,255,157,0.08) 0%,transparent 65%)", filter:"blur(30px)" }} />
-      </div>
+      {/* Layout: left brand + right form */}
+      <div style={{ minHeight:"100vh", display:"flex", position:"relative", zIndex:2 }}>
 
-      {/* Layout */}
-      <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24, position:"relative", zIndex:1 }}>
-        <div className={`ls-card${shake ? " ls-shake" : ""}`} style={{ width:"100%", maxWidth:440, background:"rgba(8,8,28,0.7)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:28, padding:"44px 40px 36px", boxShadow:"0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.07)", position:"relative", overflow:"hidden" }}>
+        {/* ── LEFT — Brand statement ──────────────────────── */}
+        <div style={{ flex:"0 0 48%", display:"flex", flexDirection:"column", justifyContent:"center", padding:"60px 56px", borderRight:"1px solid rgba(255,255,255,0.06)" }}>
 
-          {/* Scan line effect */}
-          <div className="ls-scan" style={{ position:"absolute", top:0, left:0, right:0, height:2, background:"linear-gradient(90deg,transparent,#00d4ff,transparent)", pointerEvents:"none" }} />
-
-          {/* Corner glow */}
-          <div style={{ position:"absolute", top:-60, right:-60, width:180, height:180, borderRadius:"50%", background:"radial-gradient(circle,rgba(124,58,237,0.2) 0%,transparent 70%)", pointerEvents:"none" }} />
-          <div style={{ position:"absolute", bottom:-60, left:-60, width:180, height:180, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,212,255,0.12) 0%,transparent 70%)", pointerEvents:"none" }} />
-
-          {/* Logo */}
-          <div className="ls-logo" style={{ textAlign:"center", marginBottom:36 }}>
-            <div style={{ position:"relative", display:"inline-flex", alignItems:"center", justifyContent:"center", width:80, height:80, marginBottom:16 }}>
-              {/* Orbit rings */}
-              <div style={{ position:"absolute", width:80, height:80, borderRadius:"50%", border:"1px solid rgba(0,212,255,0.3)", animation:"spinCW 8s linear infinite" }} />
-              <div style={{ position:"absolute", width:60, height:60, borderRadius:"50%", border:"1px solid rgba(124,58,237,0.25)", animation:"spinCW 5s linear infinite reverse" }} />
-              {/* Center */}
-              <div style={{ width:48, height:48, borderRadius:"50%", background:"linear-gradient(135deg,rgba(124,58,237,0.4),rgba(0,212,255,0.3))", display:"flex", alignItems:"center", justifyContent:"center", fontSize:24, filter:"drop-shadow(0 0 16px rgba(124,58,237,0.8))", boxShadow:"0 0 30px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.15)" }}>
-                🏥
-              </div>
-              {/* Orbiting dot */}
-              <div style={{ position:"absolute", width:6, height:6, borderRadius:"50%", background:"#00d4ff", boxShadow:"0 0 8px #00d4ff", animation:"orbit 8s linear infinite" }} />
-            </div>
-            <div style={{ fontSize:26, fontWeight:800, letterSpacing:"-0.5px" }}>
-              <span className="gradient-text">Eden Care</span>
-            </div>
-            <div style={{ fontSize:12, color:"rgba(255,255,255,0.35)", marginTop:5, letterSpacing:"2px", textTransform:"uppercase" }}>
-              Neural Pipeline Interface
-            </div>
+          {/* Medical cross */}
+          <div className="ls-cross ls-line-1" style={{ marginBottom:32 }}>
+            <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+              <rect x="20" y="0"  width="12" height="52" rx="3" fill="#dc2626"/>
+              <rect x="0"  y="20" width="52" height="12" rx="3" fill="#dc2626"/>
+            </svg>
           </div>
 
-          {/* Lockout banner */}
-          {isLocked && (
-            <div style={{ background:"rgba(255,51,102,0.1)", border:"1px solid rgba(255,51,102,0.3)", borderRadius:14, padding:"14px 18px", marginBottom:24, textAlign:"center", boxShadow:"0 0 20px rgba(255,51,102,0.1)" }}>
-              <div style={{ fontWeight:700, color:"#ff6b8a", fontSize:14 }}>⛔ Access Locked</div>
-              <div style={{ fontSize:13, color:"rgba(255,107,138,0.75)", marginTop:5 }}>
-                Retry in <strong style={{ color:"#ff6b8a" }}>{formatMs(lockRemaining)}</strong>
+          {/* Company */}
+          <div className="ls-line-2" style={{ fontSize:11, fontWeight:700, color:"#dc2626", letterSpacing:"4px", textTransform:"uppercase", marginBottom:16 }}>
+            Health Insurance Provider
+          </div>
+
+          {/* Giant heading */}
+          <h1 className="ls-line-3" style={{ fontSize:"clamp(42px, 6vw, 72px)", fontWeight:900, lineHeight:0.95, letterSpacing:"-0.04em", color:"#ffffff", marginBottom:12 }}>
+            EDEN<br/>CARE
+          </h1>
+
+          {/* Rule */}
+          <div className="ls-line-3" style={{ width:80, height:3, background:"#dc2626", marginBottom:24 }} />
+
+          <p className="ls-line-4" style={{ fontSize:15, color:"rgba(255,255,255,0.45)", lineHeight:1.7, maxWidth:340, marginBottom:40 }}>
+            Medical code intelligence pipeline. Automated processing of hospital billing catalogs for insurance claims adjudication.
+          </p>
+
+          {/* Stats row */}
+          <div className="ls-line-5" style={{ display:"flex", gap:32 }}>
+            {[["7","AI Modules"],["M4","DNA Engine"],["SHA-256","Security"]].map(([val, label]) => (
+              <div key={label}>
+                <div style={{ fontSize:22, fontWeight:900, color:"#ffffff", letterSpacing:"-0.03em" }}>{val}</div>
+                <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", letterSpacing:"1.5px", textTransform:"uppercase", marginTop:3 }}>{label}</div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
 
-          <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:20 }}>
+        {/* ── RIGHT — Login form ──────────────────────────── */}
+        <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 48px" }}>
 
-            {/* Username */}
-            <div>
-              <label style={{ display:"block", fontSize:10, fontWeight:700, color:"rgba(0,212,255,0.6)", marginBottom:8, letterSpacing:"2px", textTransform:"uppercase" }}>
-                Identifier
-              </label>
-              <input
-                className="ls-input"
-                type="text" value={username} onChange={e => setUsername(e.target.value)}
-                disabled={isLocked || loading} autoComplete="username"
-                placeholder="Your username"
-                style={{ width:"100%", padding:"13px 16px", borderRadius:14, border:`1.5px solid ${error && !isLocked ? "rgba(255,51,102,0.5)" : "rgba(255,255,255,0.08)"}`, fontSize:14, background:"rgba(255,255,255,0.04)", color:"#fff", boxSizing:"border-box", transition:"all 0.25s" }}
-              />
-            </div>
+          <div
+            ref={cardRef}
+            className={`ls-tilt${shake ? " ls-shake" : ""}`}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={{ width:"100%", maxWidth:400, background:"rgba(12,12,12,0.92)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:20, overflow:"hidden", boxShadow:"0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)", position:"relative" }}
+          >
+            {/* Scan beam */}
+            <div className="ls-scan" />
 
-            {/* Passcode */}
-            <div>
-              <label style={{ display:"block", fontSize:10, fontWeight:700, color:"rgba(0,212,255,0.6)", marginBottom:8, letterSpacing:"2px", textTransform:"uppercase" }}>
-                Passcode
-              </label>
-              <div style={{ position:"relative" }}>
-                <input
-                  className="ls-input"
-                  type={showPass ? "text" : "password"} value={passcode} onChange={e => setPasscode(e.target.value)}
-                  disabled={isLocked || loading} autoComplete="current-password"
-                  placeholder="••••••••"
-                  style={{ width:"100%", padding:"13px 48px 13px 16px", borderRadius:14, border:`1.5px solid ${error && !isLocked ? "rgba(255,51,102,0.5)" : "rgba(255,255,255,0.08)"}`, fontSize:14, background:"rgba(255,255,255,0.04)", color:"#fff", boxSizing:"border-box", transition:"all 0.25s" }}
-                />
-                <button type="button" onClick={() => setShowPass(p => !p)} tabIndex={-1}
-                  style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:15, color:"rgba(255,255,255,0.3)", padding:4, transition:"color 0.15s" }}>
-                  {showPass ? "🙈" : "👁️"}
-                </button>
-              </div>
-            </div>
+            {/* Top red stripe */}
+            <div style={{ height:3, background:"linear-gradient(90deg,#dc2626,#ef4444,#dc2626)", backgroundSize:"200%", animation:"borderMarch 2s linear infinite" }} />
+            <style>{`@keyframes borderMarch{0%{background-position:0%}100%{background-position:200%}}`}</style>
 
-            {/* Attempt dots */}
-            {attemptsUsed > 0 && !isLocked && (
-              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                <span style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"1px", textTransform:"uppercase" }}>Attempts</span>
-                <div style={{ display:"flex", gap:5 }}>
-                  {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
-                    <div key={i} className="ls-attempt-dot" style={{ width:8, height:8, borderRadius:"50%", background: i < attemptsUsed ? "#ff3366" : "rgba(255,255,255,0.1)", boxShadow: i < attemptsUsed ? "0 0 10px rgba(255,51,102,0.9)" : "none" }} />
-                  ))}
+            <div style={{ padding:"36px 36px 32px" }}>
+
+              {/* Card heading */}
+              <div style={{ marginBottom:32 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:"#dc2626", letterSpacing:"3px", textTransform:"uppercase", marginBottom:8 }}>
+                  Secure Access
+                </div>
+                <div style={{ fontSize:22, fontWeight:800, color:"#ffffff", letterSpacing:"-0.03em" }}>
+                  Authorize Entry
                 </div>
               </div>
-            )}
 
-            {/* Error */}
-            {error && !isLocked && (
-              <div style={{ background:"rgba(255,51,102,0.08)", border:"1px solid rgba(255,51,102,0.2)", borderRadius:12, padding:"11px 15px", fontSize:13, color:"#ff8fab", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ flexShrink:0 }}>⚠️</span> {error}
-              </div>
-            )}
+              {/* Lockout */}
+              {isLocked && (
+                <div style={{ background:"rgba(220,38,38,0.08)", border:"1px solid rgba(220,38,38,0.3)", borderRadius:12, padding:"14px 16px", marginBottom:24, display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:"#dc2626", flexShrink:0 }} />
+                  <div>
+                    <div style={{ fontWeight:700, color:"#ef4444", fontSize:13 }}>Access Suspended</div>
+                    <div style={{ fontSize:12, color:"rgba(220,38,38,0.7)", marginTop:2 }}>Retry in <strong style={{ color:"#ef4444" }}>{formatMs(lockRemaining)}</strong></div>
+                  </div>
+                </div>
+              )}
 
-            {/* Submit */}
-            <button
-              className="ls-btn"
-              type="submit" disabled={isLocked || loading || !username.trim() || !passcode}
-              style={{ padding:"15px", borderRadius:16, border:"none", background: isLocked ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg,#7c3aed 0%,#00d4ff 100%)", color: isLocked ? "rgba(255,255,255,0.2)" : "#fff", fontWeight:800, fontSize:15, cursor: isLocked ? "not-allowed" : "pointer", letterSpacing:"0.3px", boxShadow: isLocked ? "none" : "0 8px 32px rgba(124,58,237,0.4), 0 2px 0 rgba(255,255,255,0.1) inset", marginTop:4 }}>
-              {loading ? (
-                <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
-                  <span style={{ width:16, height:16, borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", display:"inline-block", animation:"spinCW 0.8s linear infinite" }} />
-                  Authenticating…
+              <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:18 }}>
+
+                {/* Username */}
+                <div>
+                  <label style={{ display:"block", fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", letterSpacing:"2px", textTransform:"uppercase", marginBottom:8 }}>
+                    Identifier
+                  </label>
+                  <input
+                    className="input-black"
+                    type="text" value={username} onChange={e => setUsername(e.target.value)}
+                    disabled={isLocked || loading} autoComplete="username" placeholder="Username"
+                    style={{ width:"100%", padding:"12px 14px", borderRadius:10, fontSize:14, boxSizing:"border-box", border:`1px solid ${error && !isLocked ? "rgba(220,38,38,0.5)" : "rgba(255,255,255,0.1)"}`, background:"rgba(255,255,255,0.04)", color:"#fff" }}
+                  />
+                </div>
+
+                {/* Passcode */}
+                <div>
+                  <label style={{ display:"block", fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", letterSpacing:"2px", textTransform:"uppercase", marginBottom:8 }}>
+                    Passcode
+                  </label>
+                  <div style={{ position:"relative" }}>
+                    <input
+                      className="input-black"
+                      type={showPass ? "text" : "password"} value={passcode} onChange={e => setPasscode(e.target.value)}
+                      disabled={isLocked || loading} autoComplete="current-password" placeholder="••••••••••"
+                      style={{ width:"100%", padding:"12px 44px 12px 14px", borderRadius:10, fontSize:14, boxSizing:"border-box", border:`1px solid ${error && !isLocked ? "rgba(220,38,38,0.5)" : "rgba(255,255,255,0.1)"}`, background:"rgba(255,255,255,0.04)", color:"#fff" }}
+                    />
+                    <button type="button" onClick={() => setShowPass(p => !p)} tabIndex={-1}
+                      style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.3)", fontSize:14, padding:4 }}>
+                      {showPass ? "🙈" : "👁"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Attempt dots */}
+                {attemptsUsed > 0 && !isLocked && (
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{ fontSize:10, color:"rgba(255,255,255,0.25)", letterSpacing:"1.5px", textTransform:"uppercase" }}>Attempts</span>
+                    <div style={{ display:"flex", gap:5 }}>
+                      {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
+                        <div key={i} style={{ width:7, height:7, borderRadius:"50%", transition:"all 0.2s", background: i < attemptsUsed ? "#dc2626" : "rgba(255,255,255,0.1)", boxShadow: i < attemptsUsed ? "0 0 8px rgba(220,38,38,0.8)" : "none" }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error */}
+                {error && !isLocked && (
+                  <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderRadius:10, background:"rgba(220,38,38,0.08)", border:"1px solid rgba(220,38,38,0.25)", fontSize:12, color:"#fca5a5" }}>
+                    <div style={{ width:6, height:6, borderRadius:"50%", background:"#dc2626", flexShrink:0 }} />
+                    {error}
+                  </div>
+                )}
+
+                {/* Submit */}
+                <button
+                  className="btn-red"
+                  type="submit" disabled={isLocked || loading || !username.trim() || !passcode}
+                  style={{ padding:"14px", borderRadius:12, fontSize:13, letterSpacing:"3px", marginTop:4 }}
+                >
+                  {loading ? (
+                    <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
+                      <span style={{ width:14, height:14, borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", display:"inline-block", animation:"spinCW 0.8s linear infinite" }} />
+                      VERIFYING
+                    </span>
+                  ) : isLocked ? "LOCKED" : "AUTHORIZE ACCESS"}
+                </button>
+              </form>
+
+              {/* Footer */}
+              <div style={{ marginTop:24, paddingTop:20, borderTop:"1px solid rgba(255,255,255,0.06)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ fontSize:9, color:"rgba(255,255,255,0.18)", letterSpacing:"1px", textTransform:"uppercase" }}>
+                  SHA-256 · Rate Limited
                 </span>
-              ) : isLocked ? "⛔ Temporarily Locked" : "Authorize Access →"}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <div style={{ marginTop:28, textAlign:"center", fontSize:10, color:"rgba(255,255,255,0.15)", letterSpacing:"1px" }}>
-            SHA-256 ENCRYPTED · {MAX_ATTEMPTS} ATTEMPTS · {LOCKOUT_MS / 60000}MIN LOCKOUT
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div className="live-dot" style={{ width:5, height:5 }} />
+                  <span style={{ fontSize:9, color:"rgba(220,38,38,0.6)", letterSpacing:"1px", textTransform:"uppercase" }}>Secured</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <style>{`
-        @keyframes spinCW { to{transform:rotate(360deg)} }
-        @keyframes orbit { from{transform:rotate(0deg) translateX(28px) rotate(0deg)} to{transform:rotate(360deg) translateX(28px) rotate(-360deg)} }
-      `}</style>
+      <style>{`@keyframes spinCW { to { transform: rotate(360deg); } }`}</style>
     </>
   );
 }

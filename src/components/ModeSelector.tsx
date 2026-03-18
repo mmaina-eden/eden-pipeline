@@ -1,184 +1,200 @@
 /**
- * ModeSelector — Cinematic mode selection after login.
- * Full-screen with particle field, 3D-style cards, animated reveal.
+ * ModeSelector — Stark black/white/red mode selection.
+ * Two extreme cards: white (auto) and black-on-white (manual).
+ * 3D tilt on hover, red CTA, bold typography.
  */
-import ParticleField from "./ParticleField";
+import { useRef } from "react";
+import ThreeBackground from "./ThreeBackground";
 
 const CSS = `
-  @keyframes ms-fadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes ms-shine  { 0%{background-position:-200% center} 100%{background-position:200% center} }
-  @keyframes ms-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-  .ms-title  { animation: ms-fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both; }
-  .ms-cards  { animation: ms-fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.25s both; }
-  .ms-footer { animation: ms-fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) 0.4s both; }
+  .ms-stagger-1 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.0s both; }
+  .ms-stagger-2 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both; }
+  .ms-stagger-3 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.2s both; }
+  .ms-stagger-4 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
 
-  .ms-card {
-    position: relative; cursor: pointer; overflow: hidden;
-    border-radius: 24px;
-    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
-                box-shadow 0.3s ease,
-                border-color 0.3s ease;
-  }
-  .ms-card::before {
-    content:''; position:absolute; inset:0; border-radius:24px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%);
-    opacity:0; transition:opacity 0.3s;
-  }
-  .ms-card:hover::before { opacity:1; }
-  .ms-card.auto:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 30px 80px rgba(0,212,255,0.25), 0 0 0 1px rgba(0,212,255,0.4);
-    border-color: rgba(0,212,255,0.5) !important;
-  }
-  .ms-card.manual:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 30px 80px rgba(124,58,237,0.25), 0 0 0 1px rgba(124,58,237,0.4);
-    border-color: rgba(124,58,237,0.5) !important;
-  }
-  .ms-card:active { transform: scale(0.98) !important; }
+  .ms-tilt { transform-style:preserve-3d; transition:transform 0.12s ease; will-change:transform; }
 
-  .ms-icon { animation: ms-float 3s ease-in-out infinite; }
-  .ms-icon-2 { animation: ms-float 3s ease-in-out infinite 0.4s; }
-
-  .ms-cta {
+  /* AUTO card — white on black */
+  .ms-card-auto {
+    background: #ffffff; color: #000000;
+    border: none;
+    cursor: pointer;
+    transition: box-shadow 0.3s ease;
+  }
+  .ms-card-auto:hover {
+    box-shadow: 0 32px 80px rgba(255,255,255,0.15), 0 0 0 2px rgba(255,255,255,0.5);
+  }
+  .ms-card-auto .ms-feature { color: rgba(0,0,0,0.55); }
+  .ms-card-auto .ms-feature-check { color: #dc2626; }
+  .ms-card-auto .ms-tag { background: #000; color: #fff; }
+  .ms-card-auto .ms-cta {
+    background: #dc2626; color: #fff;
+    border: none; cursor: pointer;
+    font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
     transition: all 0.2s;
-    position: relative; overflow: hidden;
   }
-  .ms-cta::after {
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(135deg,rgba(255,255,255,0.2),transparent);
-    opacity:0; transition:opacity 0.2s;
-  }
-  .ms-card:hover .ms-cta::after { opacity:1; }
-  .ms-card:hover .ms-cta { letter-spacing:1px; }
+  .ms-card-auto .ms-cta:hover { background: #b91c1c; transform: translateY(-1px); }
 
-  .gradient-text {
-    background:linear-gradient(135deg,#00d4ff 0%,#a855f7 50%,#00d4ff 100%);
-    background-size:200% auto;
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
-    animation: ms-shine 4s linear infinite;
+  /* MANUAL card — black on black, white border */
+  .ms-card-manual {
+    background: #0d0d0d; color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.12);
+    cursor: pointer;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .ms-card-manual:hover {
+    border-color: rgba(255,255,255,0.5);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.2);
+  }
+  .ms-card-manual .ms-feature { color: rgba(255,255,255,0.45); }
+  .ms-card-manual .ms-feature-check { color: #dc2626; }
+  .ms-card-manual .ms-tag { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+  .ms-card-manual .ms-cta {
+    background: transparent; color: #fff;
+    border: 1px solid rgba(255,255,255,0.25); cursor: pointer;
+    font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .ms-card-manual .ms-cta:hover { border-color: #dc2626; color: #dc2626; background: rgba(220,38,38,0.08); }
+
+  /* Divider line with label */
+  .ms-divider { position: relative; display: flex; align-items: center; gap: 16px; }
+  .ms-divider::before, .ms-divider::after {
+    content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.08);
   }
 `;
 
-interface Props {
-  onSelect: (mode: "auto" | "manual") => void;
+function TiltCard({ children, className, style, onClick }: React.PropsWithChildren<{ className?: string; style?: React.CSSProperties; onClick: () => void }>) {
+  const ref = useRef<HTMLDivElement>(null);
+  function onMove(e: React.MouseEvent<HTMLDivElement>) {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const dx = (e.clientX - (r.left + r.width  / 2)) / (r.width  / 2);
+    const dy = (e.clientY - (r.top  + r.height / 2)) / (r.height / 2);
+    el.style.transform = `perspective(800px) rotateY(${dx * 7}deg) rotateX(${-dy * 6}deg) scale3d(1.02,1.02,1.02)`;
+  }
+  function onLeave() {
+    const el = ref.current; if (!el) return;
+    el.style.transform = "perspective(800px) rotateY(0) rotateX(0) scale3d(1,1,1)";
+  }
+  return (
+    <div ref={ref} className={`ms-tilt ${className || ""}`} style={{ ...style, borderRadius:20, overflow:"hidden" }}
+      onMouseMove={onMove} onMouseLeave={onLeave} onClick={onClick}>
+      {children}
+    </div>
+  );
 }
+
+interface Props { onSelect: (mode: "auto" | "manual") => void; }
 
 export default function ModeSelector({ onSelect }: Props) {
   return (
     <>
       <style>{CSS}</style>
-      <ParticleField />
+      <ThreeBackground />
 
-      {/* Ambient orbs */}
-      <div style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none", overflow:"hidden" }}>
-        <div style={{ position:"absolute", top:"10%", left:"5%", width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(0,212,255,0.1) 0%,transparent 70%)", filter:"blur(60px)" }} />
-        <div style={{ position:"absolute", bottom:"5%", right:"5%", width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(124,58,237,0.12) 0%,transparent 70%)", filter:"blur(60px)" }} />
-      </div>
+      {/* Dark overlay */}
+      <div style={{ position:"fixed", inset:0, zIndex:1, pointerEvents:"none", background:"rgba(0,0,0,0.55)" }} />
 
-      <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 24px", gap:40, position:"relative", zIndex:1 }}>
+      <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 24px", position:"relative", zIndex:2 }}>
 
-        {/* Title block */}
-        <div className="ms-title" style={{ textAlign:"center" }}>
-          <div style={{ fontSize:48, marginBottom:12, filter:"drop-shadow(0 0 20px rgba(124,58,237,0.7))" }}>🏥</div>
-          <div style={{ fontSize:32, fontWeight:900, letterSpacing:"-1px", lineHeight:1.1, marginBottom:10 }}>
-            <span className="gradient-text">Choose Your Mode</span>
+        {/* ── Header ──────────────────────────────────────── */}
+        <div className="ms-stagger-1" style={{ textAlign:"center", marginBottom:48 }}>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:10, marginBottom:20, padding:"6px 16px 6px 10px", borderRadius:20, border:"1px solid rgba(220,38,38,0.35)", background:"rgba(220,38,38,0.08)" }}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="5.5" y="0" width="3" height="14" rx="1" fill="#dc2626"/>
+              <rect x="0" y="5.5" width="14" height="3" rx="1" fill="#dc2626"/>
+            </svg>
+            <span style={{ fontSize:10, fontWeight:700, color:"#dc2626", letterSpacing:"2.5px", textTransform:"uppercase" }}>Eden Care Pipeline</span>
           </div>
-          <div style={{ color:"rgba(255,255,255,0.38)", fontSize:14, maxWidth:380, margin:"0 auto", lineHeight:1.6 }}>
-            Select how you'd like to process your medical catalog data through the Eden pipeline
-          </div>
+          <h2 style={{ fontSize:"clamp(28px, 4vw, 48px)", fontWeight:900, color:"#ffffff", letterSpacing:"-0.04em", lineHeight:1, marginBottom:12 }}>
+            Select Processing Mode
+          </h2>
+          <p style={{ fontSize:14, color:"rgba(255,255,255,0.38)", maxWidth:380, margin:"0 auto" }}>
+            Choose how you want to process your insurance catalog data through the pipeline
+          </p>
         </div>
 
-        {/* Cards */}
-        <div className="ms-cards" style={{ display:"flex", gap:24, flexWrap:"wrap", justifyContent:"center", maxWidth:740, width:"100%" }}>
+        {/* ── Cards ───────────────────────────────────────── */}
+        <div className="ms-stagger-2" style={{ display:"flex", gap:20, flexWrap:"wrap", justifyContent:"center", maxWidth:760, width:"100%" }}>
 
-          {/* ── AUTO ─────────────────────────────────────────── */}
-          <div className="ms-card auto" onClick={() => onSelect("auto")}
-            style={{ flex:"1 1 300px", maxWidth:340, background:"rgba(0,12,28,0.75)", backdropFilter:"blur(32px)", WebkitBackdropFilter:"blur(32px)", border:"1.5px solid rgba(0,212,255,0.2)", padding:"32px 28px", display:"flex", flexDirection:"column", gap:20, boxShadow:"0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
-
-            {/* Icon + label */}
-            <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-              <div className="ms-icon" style={{ width:60, height:60, borderRadius:18, background:"linear-gradient(135deg,rgba(0,212,255,0.25),rgba(0,212,255,0.08))", border:"1px solid rgba(0,212,255,0.35)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, boxShadow:"0 0 24px rgba(0,212,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)", flexShrink:0 }}>
-                🤖
+          {/* AUTO — white card */}
+          <TiltCard className="ms-card-auto" style={{ flex:"1 1 320px", maxWidth:360 }} onClick={() => onSelect("auto")}>
+            <div style={{ padding:"32px 28px 28px" }}>
+              {/* Tag */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28 }}>
+                <span className="ms-tag" style={{ fontSize:9, fontWeight:800, padding:"4px 10px", borderRadius:6, letterSpacing:"2px", textTransform:"uppercase" }}>
+                  Recommended
+                </span>
+                <span style={{ fontSize:28 }}>🤖</span>
               </div>
-              <div>
-                <div style={{ color:"#67e8f9", fontWeight:800, fontSize:20, letterSpacing:"-0.3px" }}>Auto Mode</div>
-                <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:4 }}>
-                  <span style={{ width:6, height:6, borderRadius:"50%", background:"#00ff9d", boxShadow:"0 0 8px #00ff9d", display:"inline-block" }} />
-                  <span style={{ color:"rgba(0,255,157,0.7)", fontSize:11, fontWeight:600, letterSpacing:"1px" }}>FULLY AUTOMATED</span>
-                </div>
-              </div>
+
+              <h3 style={{ fontSize:24, fontWeight:900, letterSpacing:"-0.04em", marginBottom:6, color:"inherit" }}>
+                Auto Mode
+              </h3>
+              <p className="ms-feature" style={{ fontSize:13, lineHeight:1.6, marginBottom:24 }}>
+                Upload once. All 7 modules execute automatically with live status updates.
+              </p>
+
+              <ul style={{ listStyle:"none", display:"flex", flexDirection:"column", gap:10, marginBottom:28 }}>
+                {["Upload → full pipeline executes","Live neural status per module","Delta report auto-downloads","Zero manual intervention"].map(f => (
+                  <li key={f} style={{ display:"flex", gap:10, fontSize:12.5, alignItems:"flex-start" }}>
+                    <span className="ms-feature-check" style={{ fontWeight:900, flexShrink:0, marginTop:1 }}>✕</span>
+                    <span className="ms-feature">{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <button className="ms-cta" style={{ width:"100%", padding:"14px", borderRadius:12, fontSize:12 }}>
+                Launch Auto Pipeline →
+              </button>
             </div>
+          </TiltCard>
 
-            <div style={{ color:"rgba(255,255,255,0.5)", fontSize:13, lineHeight:1.7 }}>
-              Upload your files once and watch the entire pipeline execute automatically. Real-time status for every module.
-            </div>
-
-            <ul style={{ margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:9 }}>
-              {[
-                ["🚀","Upload once — all 7 modules run"],
-                ["📡","Live neural status indicators"],
-                ["⚡","Delta report auto-downloads"],
-                ["🎯","Ideal for batch processing"],
-              ].map(([icon, text]) => (
-                <li key={text} style={{ display:"flex", alignItems:"flex-start", gap:10, fontSize:12.5, color:"rgba(255,255,255,0.45)" }}>
-                  <span style={{ flexShrink:0, fontSize:13 }}>{icon}</span>
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* CTA */}
-            <button className="ms-cta" style={{ marginTop:"auto", padding:"14px", borderRadius:14, border:"none", background:"linear-gradient(135deg,rgba(0,212,255,0.85),rgba(0,180,220,0.6))", color:"#fff", fontWeight:800, fontSize:13, cursor:"pointer", letterSpacing:"0.3px", boxShadow:"0 6px 24px rgba(0,212,255,0.3), inset 0 1px 0 rgba(255,255,255,0.2)", transition:"all 0.2s" }}>
-              Launch Auto Pipeline →
-            </button>
+          {/* Divider */}
+          <div className="ms-divider" style={{ alignSelf:"stretch", flexDirection:"column", width:1, minHeight:300 }}>
+            <div style={{ flex:1, width:1, background:"rgba(255,255,255,0.07)" }} />
+            <span style={{ fontSize:10, color:"rgba(255,255,255,0.2)", letterSpacing:"2px", textTransform:"uppercase", writingMode:"vertical-lr" }}>or</span>
+            <div style={{ flex:1, width:1, background:"rgba(255,255,255,0.07)" }} />
           </div>
 
-          {/* ── MANUAL ───────────────────────────────────────── */}
-          <div className="ms-card manual" onClick={() => onSelect("manual")}
-            style={{ flex:"1 1 300px", maxWidth:340, background:"rgba(8,4,22,0.75)", backdropFilter:"blur(32px)", WebkitBackdropFilter:"blur(32px)", border:"1.5px solid rgba(124,58,237,0.2)", padding:"32px 28px", display:"flex", flexDirection:"column", gap:20, boxShadow:"0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
-
-            {/* Icon + label */}
-            <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-              <div className="ms-icon-2" style={{ width:60, height:60, borderRadius:18, background:"linear-gradient(135deg,rgba(124,58,237,0.3),rgba(168,85,247,0.1))", border:"1px solid rgba(124,58,237,0.4)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, boxShadow:"0 0 24px rgba(124,58,237,0.2), inset 0 1px 0 rgba(255,255,255,0.1)", flexShrink:0 }}>
-                🎛️
+          {/* MANUAL — dark card */}
+          <TiltCard className="ms-card-manual" style={{ flex:"1 1 320px", maxWidth:360 }} onClick={() => onSelect("manual")}>
+            <div style={{ padding:"32px 28px 28px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28 }}>
+                <span className="ms-tag" style={{ fontSize:9, fontWeight:700, padding:"4px 10px", borderRadius:6, letterSpacing:"2px", textTransform:"uppercase" }}>
+                  Full Control
+                </span>
+                <span style={{ fontSize:28 }}>🎛️</span>
               </div>
-              <div>
-                <div style={{ color:"#c4b5fd", fontWeight:800, fontSize:20, letterSpacing:"-0.3px" }}>Manual Mode</div>
-                <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:4 }}>
-                  <span style={{ width:6, height:6, borderRadius:"50%", background:"#a855f7", boxShadow:"0 0 8px #a855f7", display:"inline-block" }} />
-                  <span style={{ color:"rgba(168,85,247,0.7)", fontSize:11, fontWeight:600, letterSpacing:"1px" }}>STEP-BY-STEP</span>
-                </div>
-              </div>
+
+              <h3 style={{ fontSize:24, fontWeight:900, letterSpacing:"-0.04em", marginBottom:6, color:"inherit" }}>
+                Manual Mode
+              </h3>
+              <p className="ms-feature" style={{ fontSize:13, lineHeight:1.6, marginBottom:24 }}>
+                Step through each module individually. Inspect and verify at every stage.
+              </p>
+
+              <ul style={{ listStyle:"none", display:"flex", flexDirection:"column", gap:10, marginBottom:28 }}>
+                {["Step-by-step navigation","Inspect results per module","Modify inputs before advancing","Best for QA & troubleshooting"].map(f => (
+                  <li key={f} style={{ display:"flex", gap:10, fontSize:12.5, alignItems:"flex-start" }}>
+                    <span className="ms-feature-check" style={{ fontWeight:900, flexShrink:0, marginTop:1 }}>✕</span>
+                    <span className="ms-feature">{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <button className="ms-cta" style={{ width:"100%", padding:"14px", borderRadius:12, fontSize:12 }}>
+                Start Manual Mode →
+              </button>
             </div>
-
-            <div style={{ color:"rgba(255,255,255,0.5)", fontSize:13, lineHeight:1.7 }}>
-              Navigate each module individually. Inspect and verify results at every stage before advancing. Full precision control.
-            </div>
-
-            <ul style={{ margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:9 }}>
-              {[
-                ["🔬","Module-by-module navigation"],
-                ["🔎","Review results at each stage"],
-                ["✏️","Modify inputs before proceeding"],
-                ["🛡️","Best for QA & troubleshooting"],
-              ].map(([icon, text]) => (
-                <li key={text} style={{ display:"flex", alignItems:"flex-start", gap:10, fontSize:12.5, color:"rgba(255,255,255,0.45)" }}>
-                  <span style={{ flexShrink:0, fontSize:13 }}>{icon}</span>
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ul>
-
-            <button className="ms-cta" style={{ marginTop:"auto", padding:"14px", borderRadius:14, border:"none", background:"linear-gradient(135deg,rgba(124,58,237,0.85),rgba(168,85,247,0.6))", color:"#fff", fontWeight:800, fontSize:13, cursor:"pointer", letterSpacing:"0.3px", boxShadow:"0 6px 24px rgba(124,58,237,0.3), inset 0 1px 0 rgba(255,255,255,0.2)", transition:"all 0.2s" }}>
-              Start Manual Pipeline →
-            </button>
-          </div>
+          </TiltCard>
         </div>
 
-        {/* Footer note */}
-        <div className="ms-footer" style={{ color:"rgba(255,255,255,0.18)", fontSize:12, letterSpacing:"0.5px" }}>
-          Switch modes anytime via the control bar above
+        {/* ── Footer note ─────────────────────────────────── */}
+        <div className="ms-stagger-4" style={{ marginTop:36, fontSize:11, color:"rgba(255,255,255,0.2)", letterSpacing:"0.5px" }}>
+          Switch modes at any time from the navigation bar
         </div>
       </div>
     </>

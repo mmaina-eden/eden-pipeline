@@ -5,6 +5,7 @@ import ApiKeyPanel from "./components/ApiKeyPanel";
 import AdminPanel from "./components/AdminPanel";
 import ModeSelector from "./components/ModeSelector";
 import AutoModePipeline from "./components/AutoModePipeline";
+import ThreeBackground from "./components/ThreeBackground";
 import { usePipelineState } from "./hooks/usePipelineState";
 import { useAuditLog } from "./hooks/useAuditLog";
 import { SESSION_KEY } from "./auth.config";
@@ -157,7 +158,9 @@ export default function App() {
   // ── Auto mode ──────────────────────────────────────────────────────────────
   if (mode === "auto") {
     return (
-      <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#0a0a1a 0%,#0f172a 100%)" }}>
+      <div style={{ minHeight: "100vh", background: "#000000", position:"relative" }}>
+        <ThreeBackground />
+        <div style={{ position:"relative", zIndex:1 }}>
         <PipelineStepper
           activeStep={0}
           completedSteps={new Set()}
@@ -176,13 +179,16 @@ export default function App() {
           <AdminPanel currentUser={user} onClose={() => { setShowAdmin(false); refreshUserCount(); }} />
         )}
         {toast && <Toast msg={toast} />}
+        </div>
       </div>
     );
   }
 
   // ── Manual mode ────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg,#0a0a1a 0%,#0f172a 100%)" }}>
+    <div style={{ minHeight: "100vh", background: "#000000", position:"relative" }}>
+      <ThreeBackground />
+      <div style={{ position:"relative", zIndex:1 }}>
       <PipelineStepper
         activeStep={activeStep}
         completedSteps={completed}
@@ -258,6 +264,7 @@ export default function App() {
         <AdminPanel currentUser={user} onClose={() => { setShowAdmin(false); refreshUserCount(); }} />
       )}
       {toast && <Toast msg={toast} />}
+      </div>
     </div>
   );
 }
@@ -266,11 +273,12 @@ function Toast({ msg }: { msg: string }) {
   return (
     <div style={{
       position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
-      background: "rgba(20,20,40,0.95)", border: "1px solid rgba(255,255,255,0.12)",
-      borderRadius: 12, padding: "12px 24px", color: "#fff", fontSize: 13,
-      fontWeight: 600, zIndex: 9999, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-      backdropFilter: "blur(12px)", whiteSpace: "nowrap",
-      animation: "toastIn 0.3s ease",
+      background: "#111111", border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: 10, padding: "12px 24px", color: "#fff", fontSize: 12,
+      fontWeight: 700, zIndex: 9999, boxShadow: "0 8px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)",
+      whiteSpace: "nowrap", letterSpacing:"0.5px",
+      animation: "toastSlide 0.3s cubic-bezier(0.16,1,0.3,1)",
+      borderLeft: "3px solid #dc2626",
     }}>
       {msg}
     </div>
