@@ -1,6 +1,6 @@
 /**
  * Persistent API key store — keys survive page refresh and module changes.
- * Stored in localStorage under namespaced keys so they're isolated to this app.
+ * Values are base64-obfuscated to prevent casual DevTools inspection.
  */
 
 const NS: Record<string, string> = {
@@ -21,19 +21,23 @@ const NS: Record<string, string> = {
 export type ApiKeyName = keyof typeof NS;
 
 export function getStoredKey(name: ApiKeyName): string {
-  try { return localStorage.getItem(NS[name]) || ""; }
-  catch { return ""; }
+  try {
+    const raw = localStorage.getItem(NS[name]);
+    if (!raw) return "";
+    // Decode obfuscated value; fall back to raw for legacy unobfuscated entries
+    try { return atob(raw); } catch { return raw; }
+  } catch { return ""; }
 }
 
 export function storeKey(name: ApiKeyName, value: string): void {
   try {
     const trimmed = value.trim();
-    if (trimmed) localStorage.setItem(NS[name], trimmed);
+    if (trimmed) localStorage.setItem(NS[name], btoa(trimmed));
     else         localStorage.removeItem(NS[name]);
   } catch { /* storage not available */ }
 }
 
-/** Returns an object with all currently stored keys. */
+/** Returns an object with all currently stored keys (decoded). */
 export function getAllStoredKeys(): Record<ApiKeyName, string> {
   return {
     gemini:     getStoredKey("gemini"),
